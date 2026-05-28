@@ -1,11 +1,12 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   DollarSign, Users, Calendar, TrendingUp, Activity, AlertCircle, Download,
   Filter, Search, Plus, Edit2, Trash2, X, Check, Clock, UserPlus,
   FileText, Settings, BarChart3, Brain, Stethoscope, Save, ChevronDown
 } from 'lucide-react';
 import AdminHeader from '../../components/admin/AdminHeader';
+import { getAdminStats, getDoctors, getPatients } from '../../lib/api';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'doctors' | 'experts' | 'patients' | 'schedule'>('overview');
@@ -20,48 +21,11 @@ export default function AdminDashboard() {
   const [editingItem, setEditingItem] = useState<any>(null);
   const [deleteItem, setDeleteItem] = useState<any>(null);
 
-  const stats = [
-    {
-      label: 'Doanh thu tháng',
-      value: '450M',
-      change: '+12.5%',
-      trend: 'up',
-      icon: DollarSign,
-      color: 'from-green-500 to-green-600'
-    },
-    {
-      label: 'Bệnh nhân mới',
-      value: '2,543',
-      change: '+8.2%',
-      trend: 'up',
-      icon: Users,
-      color: 'from-blue-500 to-blue-600'
-    },
-    {
-      label: 'Lịch hẹn hôm nay',
-      value: '342',
-      change: '-3.1%',
-      trend: 'down',
-      icon: Calendar,
-      color: 'from-purple-500 to-purple-600'
-    },
-    {
-      label: 'Tỷ lệ lấp đầy',
-      value: '87%',
-      change: '+5.4%',
-      trend: 'up',
-      icon: TrendingUp,
-      color: 'from-orange-500 to-orange-600'
-    }
-  ];
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
-  const [doctors, setDoctors] = useState([
-    { id: 1, name: 'BS. Nguyễn Văn An', specialty: 'Tim mạch', phone: '0901234567', email: 'nva@hospital.com', status: 'active', patients: 145, revenue: '43.5M' },
-    { id: 2, name: 'BS. Trần Thị Bình', specialty: 'Nhi khoa', phone: '0902345678', email: 'ttb@hospital.com', status: 'active', patients: 132, revenue: '39.6M' },
-    { id: 3, name: 'BS. Lê Minh Cường', specialty: 'Da liễu', phone: '0903456789', email: 'lmc@hospital.com', status: 'active', patients: 128, revenue: '38.4M' },
-    { id: 4, name: 'BS. Phạm Thu Dung', specialty: 'Phụ sản', phone: '0904567890', email: 'ptd@hospital.com', status: 'active', patients: 156, revenue: '46.8M' },
-    { id: 5, name: 'BS. Hoàng Minh Đức', specialty: 'Nội khoa', phone: '0905678901', email: 'hmd@hospital.com', status: 'inactive', patients: 98, revenue: '29.4M' }
-  ]);
+  const [adminStats, setAdminStats] = useState<any>(null);
+  const [doctors, setDoctors] = useState<any[]>([]);
 
   const [experts, setExperts] = useState([
     { id: 1, name: 'Nguyễn Thị Lan', position: 'Chuyên gia AI', department: 'Chatbot & Tư vấn', phone: '0911234567', email: 'ntl@hospital.com', status: 'active', specialty: 'AI Healthcare' },
@@ -71,12 +35,7 @@ export default function AdminDashboard() {
     { id: 5, name: 'Hoàng Thị Thu', position: 'Chuyên gia nghiên cứu', department: 'R&D', phone: '0915678901', email: 'htt@hospital.com', status: 'active', specialty: 'Medical Research' }
   ]);
 
-  const [patients, setPatients] = useState([
-    { id: 1, name: 'Nguyễn Văn A', age: 45, gender: 'Nam', phone: '0921234567', lastVisit: '2024-05-01', diagnosis: 'Cao huyết áp', doctor: 'BS. Nguyễn Văn An' },
-    { id: 2, name: 'Trần Thị B', age: 32, gender: 'Nữ', phone: '0922345678', lastVisit: '2024-05-02', diagnosis: 'Viêm họng', doctor: 'BS. Trần Thị Bình' },
-    { id: 3, name: 'Lê Văn C', age: 28, gender: 'Nam', phone: '0923456789', lastVisit: '2024-05-03', diagnosis: 'Dị ứng da', doctor: 'BS. Lê Minh Cường' },
-    { id: 4, name: 'Phạm Thị D', age: 35, gender: 'Nữ', phone: '0924567890', lastVisit: '2024-05-04', diagnosis: 'Thai nghén', doctor: 'BS. Phạm Thu Dung' }
-  ]);
+  const [patients, setPatients] = useState<any[]>([]);
 
   const [schedules, setSchedules] = useState([
     { id: 1, doctor: 'BS. Nguyễn Văn An', day: 'Thứ 2', time: '08:00 - 12:00', room: 'P101', maxPatients: 20 },
@@ -85,7 +44,74 @@ export default function AdminDashboard() {
     { id: 4, doctor: 'BS. Phạm Thu Dung', day: 'Thứ 3', time: '13:00 - 17:00', room: 'P104', maxPatients: 16 }
   ]);
 
-  const specialties = ['Tất cả', 'Tim mạch', 'Nhi khoa', 'Da liễu', 'Phụ sản', 'Nội khoa'];
+  const specialties = useMemo(() => {
+    const uniq = new Set<string>();
+    doctors.forEach((d) => (d.specialties ?? []).forEach((s: string) => uniq.add(s)));
+    return ['Tất cả', ...Array.from(uniq.values())];
+  }, [doctors]);
+
+  const stats = useMemo(() => {
+    const usersCount = adminStats?.users ?? 0;
+    const doctorsCount = adminStats?.doctors ?? doctors.length;
+    const patientsCount = adminStats?.patients ?? patients.length;
+    const appointmentsCount = adminStats?.appointments ?? 0;
+    return [
+      {
+        label: 'Tổng người dùng',
+        value: String(usersCount),
+        change: 'live',
+        trend: 'up',
+        icon: Users,
+        color: 'from-blue-500 to-blue-600'
+      },
+      {
+        label: 'Bác sĩ',
+        value: String(doctorsCount),
+        change: 'live',
+        trend: 'up',
+        icon: Stethoscope,
+        color: 'from-green-500 to-green-600'
+      },
+      {
+        label: 'Bệnh nhân',
+        value: String(patientsCount),
+        change: 'live',
+        trend: 'up',
+        icon: Users,
+        color: 'from-purple-500 to-purple-600'
+      },
+      {
+        label: 'Lịch hẹn',
+        value: String(appointmentsCount),
+        change: 'live',
+        trend: 'up',
+        icon: Calendar,
+        color: 'from-orange-500 to-orange-600'
+      }
+    ];
+  }, [adminStats, doctors.length, patients.length]);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setLoadError('');
+      try {
+        const [statsData, doctorList, patientList] = await Promise.all([
+          getAdminStats(),
+          getDoctors(),
+          getPatients({ page: 0, size: 50 })
+        ]);
+        setAdminStats(statsData);
+        setDoctors(doctorList);
+        setPatients(patientList);
+      } catch (err) {
+        setLoadError(err instanceof Error ? err.message : 'Khong the tai du lieu admin tu backend');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
 
   const handleAddDoctor = () => {
     setEditingItem(null);
@@ -122,10 +148,15 @@ export default function AdminDashboard() {
     alert('Đang xuất báo cáo... File sẽ được tải về trong giây lát.');
   };
 
-  const filteredDoctors = doctors.filter(doctor => {
-    const matchesSearch = doctor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         doctor.specialty.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesSpecialty = filterSpecialty === 'all' || filterSpecialty === 'Tất cả' || doctor.specialty === filterSpecialty;
+  const filteredDoctors = doctors.filter((doctor) => {
+    const name = (doctor.fullName ?? '').toLowerCase();
+    const doctorSpecialties: string[] = doctor.specialties ?? [];
+    const specialtiesText = doctorSpecialties.join(' ').toLowerCase();
+    const matchesSearch = name.includes(searchQuery.toLowerCase()) || specialtiesText.includes(searchQuery.toLowerCase());
+    const matchesSpecialty =
+      filterSpecialty === 'all' ||
+      filterSpecialty === 'Tất cả' ||
+      doctorSpecialties.includes(filterSpecialty);
     const matchesStatus = filterStatus === 'all' || doctor.status === filterStatus;
     return matchesSearch && matchesSpecialty && matchesStatus;
   });
@@ -136,9 +167,9 @@ export default function AdminDashboard() {
     e.specialty.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredPatients = patients.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.diagnosis.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredPatients = patients.filter((p) =>
+    (p.fullName ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (p.patientCode ?? '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const filteredSchedules = schedules.filter(s =>
@@ -233,6 +264,11 @@ export default function AdminDashboard() {
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <>
+            {loadError && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 font-medium">
+                {loadError}
+              </div>
+            )}
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               {stats.map((stat, index) => (
@@ -247,10 +283,8 @@ export default function AdminDashboard() {
                     <div className={`size-14 bg-gradient-to-br ${stat.color} rounded-xl flex items-center justify-center shadow-lg`}>
                       <stat.icon className="size-7 text-white" />
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      stat.trend === 'up' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}>
-                      {stat.change}
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
+                      {loading ? 'loading' : stat.change}
                     </span>
                   </div>
                   <div className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</div>
@@ -312,16 +346,16 @@ export default function AdminDashboard() {
                   <div className="bg-gradient-to-br from-green-600 to-emerald-500 rounded-2xl shadow-lg p-6 text-white">
                     <div className="flex items-center justify-between mb-2">
                       <Users className="size-8" />
-                      <span className="text-4xl font-bold">15.2K</span>
+                      <span className="text-4xl font-bold">{patients.length}</span>
                     </div>
                     <div className="text-sm font-medium text-white/90">Tổng bệnh nhân</div>
                   </div>
                   <div className="bg-gradient-to-br from-purple-600 to-pink-500 rounded-2xl shadow-lg p-6 text-white">
                     <div className="flex items-center justify-between mb-2">
                       <Calendar className="size-8" />
-                      <span className="text-4xl font-bold">24</span>
+                      <span className="text-4xl font-bold">{adminStats?.appointments ?? 0}</span>
                     </div>
-                    <div className="text-sm font-medium text-white/90">Phòng khám</div>
+                    <div className="text-sm font-medium text-white/90">Tổng lịch hẹn</div>
                   </div>
                 </motion.div>
               </div>
@@ -374,22 +408,22 @@ export default function AdminDashboard() {
                     <h2 className="text-lg font-bold text-gray-900">Bác sĩ xuất sắc</h2>
                   </div>
                   <div className="p-6 space-y-3">
-                    {doctors.filter(d => d.status === 'active').slice(0, 4).map((doctor, index) => (
+                    {doctors.slice(0, 4).map((doctor, index) => (
                       <div key={doctor.id} className="flex items-start gap-3 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl hover:shadow-md transition-all border border-blue-100">
                         <div className="size-12 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-xl flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-lg">
                           {index + 1}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-gray-900 truncate">{doctor.name}</h3>
-                          <p className="text-sm text-blue-600 font-medium">{doctor.specialty}</p>
+                          <h3 className="font-bold text-gray-900 truncate">{doctor.fullName}</h3>
+                          <p className="text-sm text-blue-600 font-medium">{(doctor.specialties ?? []).join(', ') || '—'}</p>
                           <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
                             <div>
                               <span className="text-gray-500">BN:</span>
-                              <span className="ml-1 font-bold text-gray-900">{doctor.patients}</span>
+                              <span className="ml-1 font-bold text-gray-900">—</span>
                             </div>
                             <div>
                               <span className="text-gray-500">DT:</span>
-                              <span className="ml-1 font-bold text-green-600">{doctor.revenue}</span>
+                              <span className="ml-1 font-bold text-green-600">—</span>
                             </div>
                           </div>
                         </div>
@@ -470,17 +504,17 @@ export default function AdminDashboard() {
                     {filteredDoctors.map((doctor) => (
                       <tr key={doctor.id} className="hover:bg-blue-50/50 transition-colors">
                         <td className="px-6 py-4">
-                          <div className="font-bold text-gray-900">{doctor.name}</div>
-                          <div className="text-sm text-gray-500">{doctor.email}</div>
+                          <div className="font-bold text-gray-900">{doctor.fullName}</div>
+                          <div className="text-sm text-gray-500">{doctor.email || '—'}</div>
                         </td>
                         <td className="px-6 py-4">
                           <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                            {doctor.specialty}
+                            {(doctor.specialties ?? []).join(', ') || '—'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 font-medium">{doctor.phone}</td>
-                        <td className="px-6 py-4 text-sm font-bold text-gray-900">{doctor.patients}</td>
-                        <td className="px-6 py-4 text-sm font-bold text-green-600">{doctor.revenue}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600 font-medium">—</td>
+                        <td className="px-6 py-4 text-sm font-bold text-gray-900">—</td>
+                        <td className="px-6 py-4 text-sm font-bold text-green-600">—</td>
                         <td className="px-6 py-4">
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
                             doctor.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
@@ -656,23 +690,23 @@ export default function AdminDashboard() {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {filteredPatients.map((p) => (
                       <tr key={p.id} className="hover:bg-purple-50/50 transition-colors">
-                        <td className="px-6 py-4 font-bold text-gray-900">{p.name}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600 font-medium">{p.age}</td>
+                        <td className="px-6 py-4 font-bold text-gray-900">{p.fullName}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600 font-medium">—</td>
                         <td className="px-6 py-4">
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            p.gender === 'Nam' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'
+                            (p.gender ?? '').toLowerCase() === 'male' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'
                           }`}>
-                            {p.gender}
+                            {p.gender ?? 'unknown'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 font-medium">{p.phone}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600 font-medium">{p.lastVisit}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600 font-medium">{p.email || '—'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600 font-medium">{p.patientCode || '—'}</td>
                         <td className="px-6 py-4">
                           <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium">
-                            {p.diagnosis}
+                            {p.address || '—'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 font-medium">{p.doctor}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600 font-medium">—</td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Chỉnh sửa">
