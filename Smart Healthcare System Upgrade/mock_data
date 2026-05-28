@@ -1,0 +1,238 @@
+USE smart_healthcare;
+
+-- ==========================================================
+-- TẮT KIỂM TRA KHÓA NGOẠI ĐỂ DỌN SẠCH DỮ LIỆU CŨ MÀ KHÔNG BỊ LỖI
+-- ==========================================================
+SET FOREIGN_KEY_CHECKS = 0;
+
+TRUNCATE TABLE audit_logs;
+TRUNCATE TABLE notifications;
+TRUNCATE TABLE health_metric_readings;
+TRUNCATE TABLE ai_survey_answers;
+TRUNCATE TABLE ai_surveys;
+TRUNCATE TABLE chat_messages;
+TRUNCATE TABLE consultation_sessions;
+TRUNCATE TABLE payments;
+TRUNCATE TABLE invoice_items;
+TRUNCATE TABLE invoices;
+TRUNCATE TABLE medical_files;
+TRUNCATE TABLE lab_order_items;
+TRUNCATE TABLE lab_orders;
+TRUNCATE TABLE prescription_items;
+TRUNCATE TABLE prescriptions;
+TRUNCATE TABLE patient_allergies;
+TRUNCATE TABLE vital_signs;
+TRUNCATE TABLE encounters;
+TRUNCATE TABLE appointment_status_history;
+TRUNCATE TABLE appointments;
+TRUNCATE TABLE doctor_work_schedules;
+TRUNCATE TABLE service_features;
+TRUNCATE TABLE services;
+TRUNCATE TABLE doctor_specialties;
+TRUNCATE TABLE expert_profiles;
+TRUNCATE TABLE doctor_profiles;
+TRUNCATE TABLE patient_profiles;
+TRUNCATE TABLE user_roles;
+TRUNCATE TABLE users;
+TRUNCATE TABLE lab_test_catalog;
+TRUNCATE TABLE health_metric_types;
+TRUNCATE TABLE rooms;
+TRUNCATE TABLE specialties;
+
+-- BẬT LẠI RÀNG BUỘC KHÓA NGOẠI ĐỂ ĐẢM BẢO TÍNH TOÀN VẸN KHI CHÈN MỚI
+SET FOREIGN_KEY_CHECKS = 1;
+
+
+-- ==========================================================
+-- 1. BẢNG ĐỘC LẬP (Không phụ thuộc khóa ngoại)
+-- ==========================================================
+
+-- Chuyên khoa
+INSERT INTO specialties (id, code, name, description, icon, status) VALUES
+(1, 'CK-NOI', 'Khoa Nội tổng quát', 'Khám và điều trị các bệnh lý nội khoa', 'heart.png', 'active'),
+(2, 'CK-NHI', 'Khoa Nhi', 'Chăm sóc sức khỏe và điều trị bệnh cho trẻ em', 'baby.png', 'active'),
+(3, 'CK-SAN', 'Khoa Sản phụ khoa', 'Theo dõi thai sản và bệnh phụ khoa', 'pregnant.png', 'active');
+
+-- Phòng chức năng
+INSERT INTO rooms (id, code, name, floor, room_type, status) VALUES
+(1, 'P101', 'Phòng Khám Nội 1', 'Tầng 1', 'exam', 'active'),
+(2, 'P102', 'Phòng Khám Nhi 1', 'Tầng 1', 'exam', 'active'),
+(3, 'P-XRAY', 'Phòng Chụp X-Quang', 'Tầng hầm', 'imaging', 'active'),
+(4, 'P-LAB', 'Phòng Xét Nghiệm Máu', 'Tầng 2', 'lab', 'active');
+
+-- Danh mục xét nghiệm
+INSERT INTO lab_test_catalog (id, code, name, category, base_price, status) VALUES
+(1, 'XN-MAU', 'Tổng phân tích tế bào máu ngoại vi', 'Xét nghiệm máu', 150000.00, 'active'),
+(2, 'XN-NUOCTIEU', 'Tổng phân tích nước tiểu', 'Xét nghiệm sinh hóa', 80000.00, 'active'),
+(3, 'XN-GLUCOSE', 'Định lượng Glucose trong máu', 'Xét nghiệm sinh hóa', 60000.00, 'active');
+
+-- Danh mục chỉ số sức khỏe
+INSERT INTO health_metric_types (id, code, name, unit, normal_min, normal_max) VALUES
+(1, 'SPO2', 'Nồng độ oxy trong máu', '%', 95.00, 100.00),
+(2, 'HA-SYS', 'Huyết áp tâm thu', 'mmHg', 90.00, 120.00),
+(3, 'HA-DIA', 'Huyết áp tâm trương', 'mmHg', 60.00, 80.00),
+(4, 'WEIGHT', 'Cân nặng', 'kg', 40.00, 150.00);
+
+
+-- ==========================================================
+-- 2. TÀI KHOẢN GỐC (Users) & PHÂN QUYỀN (User_Roles)
+-- ==========================================================
+
+-- Tài khoản gốc (Mật khẩu hash mẫu của chuỗi 'password123')
+INSERT INTO users (id, email, phone, password_hash, full_name, status, email_verified_at) VALUES
+(1, 'admin@smarthealth.vn', '0901111111', '$2b$12$EixZaYVK1fsby1Z7O3V1fO', 'Nguyễn Văn Admin', 'active', NOW()),
+(2, 'bacsi.nam@smarthealth.vn', '0902222222', '$2b$12$EixZaYVK1fsby1Z7O3V1fO', 'BS. Trịnh Hoài Nam', 'active', NOW()),
+(3, 'chuyengia.lan@smarthealth.vn', '0903333333', '$2b$12$EixZaYVK1fsby1Z7O3V1fO', 'CG. Lê Thị Phương Lan', 'active', NOW()),
+(4, 'benhnhan.an@gmail.com', '0904444444', '$2b$12$EixZaYVK1fsby1Z7O3V1fO', 'Trần Văn An', 'active', NOW()),
+(5, 'benhnhan.binh@gmail.com', '0905555555', '$2b$12$EixZaYVK1fsby1Z7O3V1fO', 'Phạm Thị Bình', 'active', NOW());
+
+-- Phân quyền tài khoản (Khớp với ID bảng roles mặc định của bạn: 1:patient, 2:doctor, 3:expert, 5:admin)
+INSERT INTO user_roles (user_id, role_id) VALUES
+(1, 5), -- Admin
+(2, 2), -- Bác sĩ Nam
+(3, 3), -- Chuyên gia Lan
+(4, 1), -- Bệnh nhân An
+(5, 1); -- Bệnh nhân Bình
+
+
+-- ==========================================================
+-- 3. CÁC HỒ SƠ CHI TIẾT (Profiles)
+-- ==========================================================
+
+-- Hồ sơ bệnh nhân (Ứng với user_id 4 và 5)
+INSERT INTO patient_profiles (id, user_id, patient_code, date_of_birth, gender, address, emergency_contact_name, emergency_contact_phone, blood_type, insurance_number) VALUES
+(1, 4, 'BN-2026-0001', '1995-05-15', 'male', '123 Đường Láng, Đống Đa, Hà Nội', 'Trần Văn Bằng (Bố)', '0909999999', 'O+', 'GD4010123456789'),
+(2, 5, 'BN-2026-0002', '1988-11-23', 'female', '456 Nguyễn Trãi, Thanh Xuân, Hà Nội', 'Nguyễn Toàn (Chồng)', '0908888888', 'A+', 'DN4010987654321');
+
+-- Hồ sơ bác sĩ (Ứng với user_id 2)
+INSERT INTO doctor_profiles (id, user_id, doctor_code, title, license_no, years_experience, bio, consultation_fee, rating, review_count, status) VALUES
+(1, 2, 'BS-001', 'Thạc sĩ, Bác sĩ CKI', 'CCHN-123456-HN', 10, 'Chuyên gia nội khoa với hơn 10 năm kinh nghiệm lâm sàng.', 200000.00, 4.80, 1, 'active');
+
+-- Hồ sơ chuyên gia (Ứng với user_id 3)
+INSERT INTO expert_profiles (id, user_id, expert_code, position, department, specialty_text, status) VALUES
+(1, 3, 'CG-001', 'Cố vấn Y khoa cấp cao', 'Ban chuyên gia hệ thống', 'Tư vấn phác đồ và hỗ trợ AI chẩn đoán', 'active');
+
+
+-- ==========================================================
+-- 4. DỊCH VỤ & LỊCH LÀM VIỆC (Services & Schedules)
+-- ==========================================================
+
+-- Gán bác sĩ vào chuyên khoa Nội (doctor_id 1 vào specialty_id 1)
+INSERT INTO doctor_specialties (doctor_id, specialty_id, is_primary) VALUES
+(1, 1, TRUE);
+
+-- Gói dịch vụ khám
+INSERT INTO services (id, specialty_id, code, name, service_type, description, base_price, duration_minutes, status) VALUES
+(1, 1, 'DV-KHAMNOI', 'Khám Nội Tổng Quát tại phòng khám', 'exam', 'Khám lâm sàng nội khoa tổng quát', 150000.00, 20, 'active'),
+(2, 1, 'DV-TELE-NOI', 'Tư vấn Nội khoa trực tuyến qua Video', 'online_consultation', 'Tư vấn từ xa qua hệ thống Smart Healthcare', 200000.00, 30, 'active');
+
+-- Tính năng đi kèm dịch vụ
+INSERT INTO service_features (id, service_id, feature_text, display_order) VALUES
+(1, 1, 'Được khám trực tiếp với Thạc sĩ bác sĩ', 1),
+(2, 1, 'Hỗ trợ cấp đơn thuốc điện tử ngay sau ca khám', 2);
+
+-- Lịch làm việc bác sĩ Nam (Thứ 2, Phòng 101)
+INSERT INTO doctor_work_schedules (id, doctor_id, room_id, day_of_week, start_time, end_time, slot_minutes, max_patients, effective_from, status) VALUES
+(1, 1, 1, 2, '08:00:00', '11:30:00', 30, 7, '2026-01-01', 'active');
+
+
+-- ==========================================================
+-- 5. LỊCH HẸN & QUÁ TRÌNH LÂM SÀNG (Appointments & Encounters)
+-- ==========================================================
+
+-- Đặt lịch hẹn thành công
+INSERT INTO appointments (id, appointment_code, patient_id, doctor_id, service_id, specialty_id, room_id, appointment_type, priority, status, scheduled_start, scheduled_end, reason) VALUES
+(1, 'LH-260528-001', 1, 1, 1, 1, 1, 'offline', 'normal', 'completed', '2026-05-28 08:30:00', '2026-05-28 09:00:00', 'Đau bụng âm ỉ vùng thượng vị mấy ngày nay.');
+
+-- Lịch sử đổi trạng thái hẹn
+INSERT INTO appointment_status_history (id, appointment_id, old_status, new_status, changed_by, note) VALUES
+(1, 1, 'pending', 'confirmed', 1, 'Hệ thống tự động xác nhận lịch hẹn hợp lệ'),
+(2, 1, 'confirmed', 'completed', 2, 'Bác sĩ đã kết thúc ca khám bệnh');
+
+-- Lượt khám lâm sàng (Encounters)
+INSERT INTO encounters (id, encounter_code, appointment_id, patient_id, doctor_id, specialty_id, started_at, ended_at, chief_complaint, symptoms, diagnosis, treatment_plan, status) VALUES
+(1, 'LUOTKHAM-001', 1, 1, 1, 1, '2026-05-28 08:35:00', '2026-05-28 08:58:00', 'Đau bụng thượng vị', 'Đau âm ỉ sau ăn, có hiện tượng ợ chua nhẹ, ấn tức vùng thượng vị.', 'Viêm dạ dày tá tràng cấp tính / Trào ngược dạ dày nhẹ', 'Dùng thuốc uống theo đơn, hạn chế ăn đồ cay nóng, chua, rượu bia.', 'completed');
+
+
+-- ==========================================================
+-- 6. SINH HIỆU, ĐƠN THUỐC, XÉT NGHIỆM (Medical Data)
+-- ==========================================================
+
+-- Chỉ số sinh hiệu đo tại phòng khám
+INSERT INTO vital_signs (id, patient_id, encounter_id, measured_at, systolic_bp, diastolic_bp, heart_rate, temperature, weight_kg, height_cm) VALUES
+(1, 1, 1, '2026-05-28 08:32:00', 120, 80, 75, 36.5, 65.00, 170.00);
+
+-- Dị ứng bệnh nhân
+INSERT INTO patient_allergies (id, patient_id, allergen, severity, reaction, status) VALUES
+(1, 1, 'Penicillin', 'high', 'Nổi mề đay toàn thân, ngứa ngáy', 'active');
+
+-- Đơn thuốc
+INSERT INTO prescriptions (id, encounter_id, prescription_code, status, notes) VALUES
+(1, 1, 'DT-2026-00001', 'active', 'Uống thuốc trước bữa ăn 30 phút. Tái khám nếu có triệu chứng bất thường.');
+
+-- Thuốc chi tiết trong đơn
+INSERT INTO prescription_items (id, prescription_id, medication_name, strength, dosage, frequency, duration, instructions, morning, noon, evening, night) VALUES
+(1, 1, 'Omeprazol', '20mg', '1 viên / lần', '2 lần / ngày', '14 ngày', 'Uống trước ăn sáng và ăn tối 30 phút', TRUE, FALSE, TRUE, FALSE);
+
+-- Lệnh xét nghiệm
+INSERT INTO lab_orders (id, encounter_id, order_code, status, ordered_at, completed_at) VALUES
+(1, 1, 'XN-2026-0001', 'completed', '2026-05-28 08:40:00', '2026-05-28 08:55:00');
+
+-- Kết quả xét nghiệm đường huyết (mã 3 trong catalog)
+INSERT INTO lab_order_items (id, lab_order_id, lab_test_id, result_value, result_unit, reference_range, interpretation) VALUES
+(1, 1, 3, '5.2', 'mmol/L', '3.9 - 6.4', 'normal');
+
+-- File đính kèm hồ sơ (Ví dụ ảnh chụp đơn thuốc cũ)
+INSERT INTO medical_files (id, patient_id, encounter_id, file_type, title, file_name, file_url, file_size_bytes) VALUES
+(1, 1, 1, 'image', 'Ảnh chụp kết quả siêu âm dạ dày cũ', 'ultrasound.jpg', 'https://storage.smarthealth.vn/files/ultrasound.jpg', 204850);
+
+
+-- ==========================================================
+-- 7. TÀI CHÍNH (Invoices & Payments)
+-- ==========================================================
+
+-- Hóa đơn
+INSERT INTO invoices (id, invoice_code, appointment_id, patient_id, subtotal, service_fee, total_amount, status, issued_at, paid_at) VALUES
+(1, 'HD-2026-00001', 1, 1, 150000.00, 0.00, 150000.00, 'paid', '2026-05-28 08:15:00', '2026-05-28 08:16:00');
+
+-- Chi tiết dòng hóa đơn
+INSERT INTO invoice_items (id, invoice_id, service_id, description, quantity, unit_price, amount) VALUES
+(1, 1, 1, 'Phí khám Nội Tổng Quát', 1.00, 150000.00, 150000.00);
+
+-- Giao dịch thanh toán
+INSERT INTO payments (id, invoice_id, payment_code, method, provider, provider_transaction_id, amount, status, paid_at) VALUES
+(1, 1, 'GD-PAY-00001', 'e_wallet', 'MOMO', 'MOMO-TXN-99887766', 150000.00, 'success', '2026-05-28 08:16:00');
+
+
+-- ==========================================================
+-- 8. TƯƠNG TÁC TỪ XA & AI (Chat, Readings, Notify)
+-- ==========================================================
+
+-- Phiên tư vấn chat từ xa
+INSERT INTO consultation_sessions (id, appointment_id, patient_id, doctor_id, session_type, status, scheduled_start) VALUES
+(1, 1, 1, 1, 'chat', 'completed', '2026-05-28 08:00:00');
+
+-- Lịch sử tin nhắn
+INSERT INTO chat_messages (id, consultation_session_id, sender_user_id, message_type, body) VALUES
+(1, 1, 4, 'text', 'Chào bác sĩ, lát em tới khám trực tiếp nhé ạ.'),
+(2, 1, 2, 'text', 'Chào bạn, tôi đã thấy lịch hẹn của bạn, hẹn gặp bạn tại phòng 101.');
+
+-- Khảo sát sàng lọc AI bệnh nhân điền trước đó
+INSERT INTO ai_surveys (id, patient_id, status, ai_recommendation) VALUES
+(1, 1, 'completed', 'Dựa trên triệu chứng đau thượng vị và ợ chua, hệ thống gợi ý bạn nên đăng ký khám chuyên khoa Nội tiêu hóa.');
+
+INSERT INTO ai_survey_answers (id, survey_id, question_text, answer_text, severity_score) VALUES
+(1, 1, 'Bạn bị đau ở vị trí nào?', 'Đau vùng bụng trên rốn (thượng vị)', 2),
+(2, 1, 'Bạn có triệu chứng nào đi kèm không?', 'Có ợ chua nhẹ sau khi ăn xong', 1);
+
+-- Chỉ số sức khỏe đo từ xa tại nhà (bệnh nhân tự nhập)
+INSERT INTO health_metric_readings (id, patient_id, metric_type_id, measured_at, value_numeric, status, source) VALUES
+(1, 1, 1, '2026-05-28 06:00:00', 98.00, 'normal', 'manual');
+
+-- Thông báo trong app
+INSERT INTO notifications (id, user_id, notification_type, title, body, read_at) VALUES
+(1, 4, 'appointment', 'Lịch hẹn đã hoàn thành', 'Đơn thuốc điện tử của bạn đã sẵn sàng trên ứng dụng.', NOW());
+
+-- Nhật ký hệ thống (Audit logs)
+INSERT INTO audit_logs (id, actor_user_id, action, entity_type, entity_id, ip_address) VALUES
+(1, 2, 'UPDATE_ENCOUNTER', 'encounters', 1, '192.168.1.50');
