@@ -1,10 +1,14 @@
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { Activity, Heart, Droplet, TrendingUp, TrendingDown, Minus, Plus, Calendar, Download } from 'lucide-react';
+import { Activity, Heart, Droplet, TrendingUp, TrendingDown, Minus, Plus, Calendar, Download, X, Check } from 'lucide-react';
 
 export default function HealthTrackingPage() {
   const [timeRange, setTimeRange] = useState<'7days' | '30days' | '90days'>('30days');
+  const [showAddMetricModal, setShowAddMetricModal] = useState(false);
+  const [showExportToast, setShowExportToast] = useState(false);
+  const [showAddSuccess, setShowAddSuccess] = useState(false);
+  const [newMetric, setNewMetric] = useState({ type: 'bloodPressure', systolic: '', diastolic: '', value: '' });
 
   const bloodPressureData = [
     { date: '01/04', systolic: 120, diastolic: 80 },
@@ -130,11 +134,23 @@ export default function HealthTrackingPage() {
               <p className="text-gray-600">Giám sát các chỉ số sức khỏe quan trọng của bạn</p>
             </div>
             <div className="flex gap-3">
-              <button className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setShowExportToast(true);
+                  window.setTimeout(() => setShowExportToast(false), 3000);
+                }}
+                className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all flex items-center gap-2"
+              >
                 <Download className="size-4" />
                 Xuất báo cáo
               </button>
-              <button className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-lg hover:shadow-lg transition-all flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setShowAddMetricModal(true);
+                  setNewMetric({ type: 'bloodPressure', systolic: '', diastolic: '', value: '' });
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-lg hover:shadow-lg transition-all flex items-center gap-2"
+              >
                 <Plus className="size-4" />
                 Thêm chỉ số
               </button>
@@ -436,6 +452,138 @@ export default function HealthTrackingPage() {
           </div>
         </motion.div>
       </div>
+
+      {/* Add Metric Modal */}
+      <AnimatePresence>
+        {showAddMetricModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+            >
+              <div className="mb-5 flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Thêm chỉ số mới</h2>
+                  <p className="text-gray-600">Nhập giá trị đo lường mới nhất</p>
+                </div>
+                <button
+                  onClick={() => setShowAddMetricModal(false)}
+                  className="rounded-lg p-2 hover:bg-gray-100"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">Loại chỉ số</label>
+                  <select
+                    value={newMetric.type}
+                    onChange={(e) => setNewMetric({ ...newMetric, type: e.target.value, systolic: '', diastolic: '', value: '' })}
+                    className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-500"
+                  >
+                    <option value="bloodPressure">Huyết áp</option>
+                    <option value="heartRate">Nhịp tim</option>
+                    <option value="glucose">Đường huyết</option>
+                    <option value="weight">Cân nặng</option>
+                  </select>
+                </div>
+
+                {newMetric.type === 'bloodPressure' ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-gray-700">Tâm thu (mmHg)</label>
+                      <input
+                        type="number"
+                        value={newMetric.systolic}
+                        onChange={(e) => setNewMetric({ ...newMetric, systolic: e.target.value })}
+                        placeholder="120"
+                        className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-gray-700">Tâm trương (mmHg)</label>
+                      <input
+                        type="number"
+                        value={newMetric.diastolic}
+                        onChange={(e) => setNewMetric({ ...newMetric, diastolic: e.target.value })}
+                        placeholder="80"
+                        className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">
+                      Giá trị ({newMetric.type === 'heartRate' ? 'bpm' : newMetric.type === 'glucose' ? 'mg/dL' : 'kg'})
+                    </label>
+                    <input
+                      type="number"
+                      value={newMetric.value}
+                      onChange={(e) => setNewMetric({ ...newMetric, value: e.target.value })}
+                      placeholder={newMetric.type === 'heartRate' ? '72' : newMetric.type === 'glucose' ? '95' : '68'}
+                      className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-500"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowAddMetricModal(false);
+                  setShowAddSuccess(true);
+                  window.setTimeout(() => setShowAddSuccess(false), 2500);
+                }}
+                className="mt-6 w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white transition-all hover:shadow-lg"
+              >
+                Lưu chỉ số
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Export Toast */}
+      <AnimatePresence>
+        {showExportToast && (
+          <div className="fixed bottom-5 right-5 z-50">
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-5 py-4 text-sm font-semibold text-green-700 shadow-lg"
+            >
+              <Download className="size-5" />
+              Báo cáo sức khỏe đã được xuất thành công
+              <button onClick={() => setShowExportToast(false)}>
+                <X className="size-4" />
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Success Toast */}
+      <AnimatePresence>
+        {showAddSuccess && (
+          <div className="fixed bottom-5 right-5 z-50">
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-5 py-4 text-sm font-semibold text-green-700 shadow-lg"
+            >
+              <Check className="size-5" />
+              Đã lưu chỉ số mới thành công
+              <button onClick={() => setShowAddSuccess(false)}>
+                <X className="size-4" />
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
